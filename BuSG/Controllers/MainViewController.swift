@@ -16,7 +16,15 @@ class MainViewController: UIViewController {
         LocationProvider.shared.locationManager
     }
     
-    var currentlyPresentingSheetController: SheetController?
+    var currentlyPresentingSheetController: SheetController? {
+        var topSheetController: SheetController = sheetController
+        while let sheetController = topSheetController.presentedSheetController {
+            topSheetController = sheetController
+        }
+        return topSheetController
+    }
+    
+    var sheetController = HomeSheetController()
     
     init() {
         super.init(nibName: nil, bundle: nil)
@@ -35,7 +43,7 @@ class MainViewController: UIViewController {
                 self.present(UINavigationController(rootViewController: SettingsViewController()), animated: true)
             })),
             UIButton(type: .roundedRect, primaryAction: UIAction(handler: { _ in
-                print("CLICK")
+                LocationProvider.shared.delegate?.locationProviderDidRequestNavigateToCurrentLocation()
             }))
         ]
         
@@ -76,6 +84,16 @@ class MainViewController: UIViewController {
             stackView.heightAnchor.constraint(equalToConstant: 100),
         ])
         
+        /// Move compass below stackview
+        mapView.showsCompass = false
+        let compassButton = MKCompassButton(mapView: mapView)
+        mapView.addSubview(compassButton)
+        compassButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            compassButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -K.margin.large),
+            compassButton.topAnchor.constraint(equalTo: stackView.bottomAnchor, constant: K.margin.large),
+        ])
+        
     }
     
     required init?(coder: NSCoder) {
@@ -83,38 +101,31 @@ class MainViewController: UIViewController {
     }
     
     private func checkForUpdates() {
-        
+        UserDefaults.standard.setValue(0, forKey: K.userDefaults.lastOpenedEpoch)
+
         let nowEpoch = Date().timeIntervalSince1970
         let lastOpenedEpoch = UserDefaults.standard.double(forKey: K.userDefaults.lastOpenedEpoch)
         let lastUpdatedEpoch = UserDefaults.standard.double(forKey: K.userDefaults.lastUpdatedEpoch)
-        
+
         if lastOpenedEpoch == 0 {
             print("First Timer!")
-            // First time using app
-            let launchViewController = UIViewController()
-            launchViewController.view.backgroundColor = .systemBackground
-            launchViewController.isModalInPresentation = true
-            self.present(launchViewController, animated: true)
+            /// First time using app
+            self.present(LaunchViewController(), animated: true)
         }
         
         if lastUpdatedEpoch+604800 < nowEpoch { // 1 week = 604800 seconds
-            // Requires update of bus data
+            /// Requires update of bus data
             print("Updating Bus Data...")
             ApiProvider.shared.updateStaticData() {
                 UserDefaults.standard.setValue(nowEpoch, forKey: K.userDefaults.lastUpdatedEpoch)
             }
         }
-        
         UserDefaults.standard.setValue(nowEpoch, forKey: K.userDefaults.lastOpenedEpoch)
-        
-        // FIX: MAPPING CAUSING CRASH EXC_BAD_ACCESS
-        //ApiProvider.shared.mapBusData()
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        let homeSheetController = HomeSheetController()
-        self.present(homeSheetController, animated: true, completion: nil)
+        self.present(sheetController, animated: true)
         
         guard CLLocationManager.locationServicesEnabled() else {
             return
@@ -125,10 +136,6 @@ class MainViewController: UIViewController {
         } else {
             LocationProvider.shared.delegate?.locationProviderDidRequestNavigateToCurrentLocation()
         }
-        
-        /// Show Apple Maps logo and legal notice when sheet at min state
-        mapView.layoutMargins.bottom = 40
-        mapView.layoutMargins.top = 120
         
         checkForUpdates()
     }
@@ -160,7 +167,7 @@ extension MainViewController: MKMapViewDelegate {
     func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
         if overlay is MKPolyline {
             let polylineRenderer = MKPolylineRenderer(overlay: overlay)
-            polylineRenderer.strokeColor = UIColor.systemGreen
+            polylineRenderer.strokeColor = .systemGreen
             polylineRenderer.lineWidth = 5
             return polylineRenderer
         }
