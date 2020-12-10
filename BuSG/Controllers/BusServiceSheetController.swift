@@ -66,7 +66,7 @@ extension BusServiceSheetController: UITableViewDelegate, UITableViewDataSource 
         let cell = tableView.dequeueReusableCell(withIdentifier: K.identifiers.busService, for: indexPath) as! BusServiceTableViewCell
         cell.backgroundColor = .clear
         cell.selectedBackgroundView = FillView(solidWith: (UIScreen.main.traitCollection.userInterfaceStyle == .dark ? UIColor.white : UIColor.black).withAlphaComponent(0.1))
-        cell.textLabel?.text = busService?.busStops[indexPath.row].busStopCode
+        cell.set(busNumber: busService?.busStops[indexPath.row].busStopCode ?? "00000")
         return cell
     }
 
